@@ -5,13 +5,15 @@
 #define I2C_SDA 4
 #define I2C_SCL 5
 
-#define BOOT_DELAY 50
+#define BOOT_DELAY_MS 50
+#define POLL_PERIOD_MS 50
 
 #define NUM_SENSORS 4 
 
-uint8_t xshutGpios[NUM_SENSORS] = {14, 15, 17 ,16};//{19,18,17,16};
+uint8_t xshutGpios[NUM_SENSORS] = {14, 15, 17 ,16};
 
 VL53L0X sensors[NUM_SENSORS];
+uint16_t readings[NUM_SENSORS];
 
 static void initSensors()
 {
@@ -24,7 +26,7 @@ static void initSensors()
     gpio_put(xshutGpios[i], false);
   }
 
-  sleep_ms(BOOT_DELAY);
+  sleep_ms(BOOT_DELAY_MS);
 
   // One by one, for each sensor
   for (int i = 0; i < NUM_SENSORS; i++)
@@ -33,22 +35,22 @@ static void initSensors()
     gpio_put(xshutGpios[i], true);
 
     // Wait tBOOT
-    sleep_ms(BOOT_DELAY);
+    sleep_ms(BOOT_DELAY_MS);
 
     // Init sequence
     sensors[i] = VL53L0X(i2c0, VL53L0X_DEFAULT_ADDRESS);
     sensors[i].init();
 
-    sleep_ms(BOOT_DELAY);
+    sleep_ms(BOOT_DELAY_MS);
     sensors[i].setTimeout(500);
 
-    sleep_ms(BOOT_DELAY);
+    sleep_ms(BOOT_DELAY_MS);
     sensors[i].setAddress(VL53L0X_DEFAULT_ADDRESS + i + 1);
 
-    sleep_ms(BOOT_DELAY);
+    sleep_ms(BOOT_DELAY_MS);
     sensors[i].startContinuous();
 
-    sleep_ms(BOOT_DELAY);
+    sleep_ms(BOOT_DELAY_MS);
   }
 }
 
@@ -64,13 +66,13 @@ int main()
   gpio_pull_up(I2C_SDA);
   gpio_pull_up(I2C_SCL);
 
-  if (NUM_SENSORS == 1)
+  if (NUM_SENSORS == 1) // TODO could get rid of this block
   {
     sensors[0] = VL53L0X(i2c0, VL53L0X_DEFAULT_ADDRESS);
     sensors[0].init();
-    sleep_ms(BOOT_DELAY);
+    sleep_ms(BOOT_DELAY_MS);
     sensors[0].setTimeout(500);
-    sleep_ms(BOOT_DELAY);
+    sleep_ms(BOOT_DELAY_MS);
     sensors[0].startContinuous();
   }
   else
@@ -80,29 +82,21 @@ int main()
 
   // Initialize VL53L0X sensor
 
-  /*VL53L0X sensor(i2c0, VL53L0X_DEFAULT_ADDRESS);*/
-  /*sensor.init();*/
-  /*sensor.setTimeout(500);*/
-
-
-  // Start continuous back-to-back mode (take readings as fast as possible)
-  /*sensor.startContinuous();*/
-
   // Keep the program running
   while (1)
   {
+    printf("[");
     for (int i = 0; i < NUM_SENSORS; i++)
     {
-      uint16_t distance = sensors[i].readRangeContinuousMillimeters();
+      readings[i] = sensors[i].readRangeContinuousMillimeters();
       if (sensors[i].timeoutOccurred())
       {
-        printf("(%x) Measurement timed out\n", sensors[i].getAddress());
+        // TODO handle or signal errors
+        // sensors[i].getAddress();
       }
-      else
-      {
-        printf("(%x) Distance: %d mm\n", sensors[i].getAddress(), distance);
-      }
+      printf("%d%c", readings[i], (i != NUM_SENSORS-1) ? ',' : ']');
     }
-    sleep_ms(30); // Adjust as needed
+    printf("\n");
+    sleep_ms(POLL_PERIOD_MS); // Adjust as needed
   }
 }
