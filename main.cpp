@@ -6,19 +6,22 @@
 #define I2C_SCL 5
 
 #define BOOT_DELAY_MS 50
-#define POLL_PERIOD_MS 50
+#define POLL_PERIOD_MS 30
 
 #define NUM_SENSORS 4 
 
-uint8_t xshutGpios[NUM_SENSORS] = {14, 15, 17 ,16};
+uint8_t xshutGpios[] = {14, 15, 17 ,16};
 
 VL53L0X sensors[NUM_SENSORS];
 uint16_t readings[NUM_SENSORS];
 
-static void initSensors()
+static bool initSensors()
 {
+  bool ret = false;
   // Initialize the current sensor's XSHUT GPIO
   // And keep it low
+  printf("Initializing sensors\n");
+
   for (int i = 0; i < NUM_SENSORS; i++)
   {
     gpio_init(xshutGpios[i]);
@@ -31,6 +34,8 @@ static void initSensors()
   // One by one, for each sensor
   for (int i = 0; i < NUM_SENSORS; i++)
   {
+    printf("Sensor %d XSHUT %d\n", i, xshutGpios[i]);
+
     // Turn on its XSHUT
     gpio_put(xshutGpios[i], true);
 
@@ -52,12 +57,16 @@ static void initSensors()
 
     sleep_ms(BOOT_DELAY_MS);
   }
+
+  return ret;
 }
 
 int main()
 {
   // Initialize standard I/O over USB
   stdio_init_all();
+
+  printf("~~~ NEGATIVE LATENCY DEMO ~~~\n");
 
   // Initialize I2C0 at 400kHz
   i2c_init(i2c0, 400 * 1000);
@@ -66,19 +75,7 @@ int main()
   gpio_pull_up(I2C_SDA);
   gpio_pull_up(I2C_SCL);
 
-  if (NUM_SENSORS == 1) // TODO could get rid of this block
-  {
-    sensors[0] = VL53L0X(i2c0, VL53L0X_DEFAULT_ADDRESS);
-    sensors[0].init();
-    sleep_ms(BOOT_DELAY_MS);
-    sensors[0].setTimeout(500);
-    sleep_ms(BOOT_DELAY_MS);
-    sensors[0].startContinuous();
-  }
-  else
-  {
-    initSensors(); 
-  }
+  initSensors(); 
 
   // Initialize VL53L0X sensor
 
